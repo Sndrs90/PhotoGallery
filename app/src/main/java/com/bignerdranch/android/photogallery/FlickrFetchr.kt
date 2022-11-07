@@ -17,7 +17,7 @@ private const val TAG = "FlickrFetchr"
 
 class FlickrFetchr {
 
-    private val flickrApi: FlickrApi
+    val flickrApi: FlickrApi
 
     init {
         val retrofit: Retrofit = Retrofit.Builder()
@@ -28,7 +28,9 @@ class FlickrFetchr {
         flickrApi = retrofit.create(FlickrApi::class.java)
     }
 
-    fun fetchPhotos(): LiveData<List<GalleryItem>> {
+    // comment to see how paging works
+
+/*    fun fetchPhotos(): LiveData<List<GalleryItem>> {
         val responseLiveData: MutableLiveData<List<GalleryItem>> = MutableLiveData()
         val flickrRequest: Call<FlickrResponse> = flickrApi.fetchPhotos()
 
@@ -55,5 +57,5 @@ class FlickrFetchr {
         })
 
         return responseLiveData
-    }
+    }*/
 }

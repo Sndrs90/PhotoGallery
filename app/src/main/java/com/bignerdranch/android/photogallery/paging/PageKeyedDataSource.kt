@@ -1,0 +1,107 @@
+package com.bignerdranch.android.photogallery.paging
+
+import android.util.Log
+import androidx.lifecycle.MutableLiveData
+import androidx.paging.PageKeyedDataSource
+import com.bignerdranch.android.photogallery.FlickrFetchr
+import com.bignerdranch.android.photogallery.GalleryItem
+import com.bignerdranch.android.photogallery.api.ApiService
+import com.bignerdranch.android.photogallery.api.PhotoResponse
+import java.util.concurrent.Executor
+
+/**
+ * A data source that uses the before/after keys returned in page requests.
+ */
+class PageKeyedDataSource : PageKeyedDataSource<Int, GalleryItem>() {
+
+    val flickrFetchr = FlickrFetchr()
+    val api = flickrFetchr.flickrApi
+    var retry: (() -> Any)? = null
+    val network = MutableLiveData<NetworkState>()
+    val initial = MutableLiveData<NetworkState>()
+    private val apiService =  ApiService(api)
+    private val retryExecutor = Executor {  }
+
+    override fun loadInitial(
+        params: LoadInitialParams<Int>,
+        callback: LoadInitialCallback<Int, GalleryItem>
+    ) {
+        val currentPage = 1
+        val nextPage = currentPage + 1
+
+        //testing only
+        val testingThing = params.requestedLoadSize
+        Log.d("params", "$testingThing")
+
+        apiService.fetchPhotosSync( page = currentPage, perPage = params.requestedLoadSize,
+            onPrepared = {
+                postInitialState(NetworkState.LOADING)
+            },
+            onSuccess = {
+                val photoResponse: PhotoResponse? = it?.photos
+                var items = photoResponse?.galleryItems ?: emptyList()
+                //val items = it?.galleryItems ?: emptyList()
+                Log.d("LoadInitial", "$items")
+                retry = null
+                postInitialState(NetworkState.LOADED)
+                callback.onResult(items, null, nextPage)
+            },
+            onError = {
+                retry = {loadInitial(params, callback)}
+                postInitialState(NetworkState.error(it))
+                Log.d("Error", "$it")
+            })
+    }
+
+    override fun loadAfter(
+        params: LoadParams<Int>,
+        callback: LoadCallback<Int, GalleryItem>
+    ) {
+        val currentPage = params.key
+        val nextPage = currentPage + 1
+        Log.d("currentpage", "$currentPage")
+
+        apiService.fetchPhotosAsync(page = currentPage, perPage = params.requestedLoadSize,
+            onPrepared = {
+                postAfterState(NetworkState.LOADING)
+            },
+            onSuccess = {
+                val photoResponse: PhotoResponse? = it?.photos
+                var items = photoResponse?.galleryItems ?: emptyList()
+                //val items = it?.galleryItems ?: emptyList()
+                Log.d("LoadInitial", "$items")
+                retry = null
+                callback.onResult(items, nextPage)
+                postAfterState(NetworkState.LOADED)
+            },
+            onError = {
+                retry = { loadAfter(params, callback) }
+                postAfterState(NetworkState.error(it))
+            })
+
+    }
+
+    override fun loadBefore(
+        params: LoadParams<Int>,
+        callback: LoadCallback<Int, GalleryItem>
+    ) {
+        //ignore this
+    }
+
+    fun retryAllFailed() {
+        val prevRetry = retry
+        retry = null
+        prevRetry?.let { retry ->
+            retryExecutor.execute { retry() }
+        }
+    }
+
+    private fun postInitialState(state: NetworkState) {
+        network.postValue(state)
+        initial.postValue(state)
+    }
+
+    private fun postAfterState(state: NetworkState) {
+        network.postValue(state)
+    }
+}

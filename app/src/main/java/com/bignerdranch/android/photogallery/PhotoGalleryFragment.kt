@@ -10,6 +10,8 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
+import androidx.paging.PagedListAdapter
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bignerdranch.android.photogallery.api.FlickrApi
@@ -48,10 +50,14 @@ class PhotoGalleryFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        photoGalleryViewModel.galleryItemLiveData.observe(
+
+        val mAdapter = PhotoAdapter()
+
+        photoGalleryViewModel.galleryItemList.observe(
             viewLifecycleOwner,
-            Observer { galleryItems ->
-                photoRecyclerView.adapter = PhotoAdapter(galleryItems)
+            Observer {
+                mAdapter?.submitList(it)
+                photoRecyclerView.adapter = mAdapter
             })
     }
 
@@ -60,23 +66,34 @@ class PhotoGalleryFragment : Fragment() {
         val bindTitle: (CharSequence) -> Unit = itemTextView::setText
     }
 
-    private class PhotoAdapter(private val galleryItems: List<GalleryItem>)
-        : RecyclerView.Adapter<PhotoHolder>() {
+    private class PhotoAdapter
+        : PagedListAdapter<GalleryItem, PhotoHolder>(object : DiffUtil.ItemCallback<GalleryItem>(){
 
-        override fun onCreateViewHolder(
-            parent: ViewGroup,
-            viewType: Int
-        ): PhotoHolder {
+        override fun areItemsTheSame(oldItem: GalleryItem, newItem: GalleryItem): Boolean =
+            oldItem.id == newItem.id
+
+        override fun areContentsTheSame(oldItem: GalleryItem, newItem: GalleryItem): Boolean =
+            oldItem == newItem
+    }
+
+    ){
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoHolder {
             val textView = TextView(parent.context)
             return PhotoHolder(textView)
         }
 
-        override fun getItemCount(): Int = galleryItems.size
+        //override fun getItemCount(): Int = galleryItems.size
 
+        /** Chapter 24 challenge 2
+         * It is important to use getItem(position) here
+         */
         override fun onBindViewHolder(holder: PhotoHolder, position: Int) {
-            val galleryItem = galleryItems[position]
-            holder.bindTitle(galleryItem.title)
+            //val galleryItem = galleryItems[position]
+            val galleryItem = getItem(position)
+            galleryItem?.title?.let { holder.bindTitle(it) }
         }
+
     }
 
     companion object {
