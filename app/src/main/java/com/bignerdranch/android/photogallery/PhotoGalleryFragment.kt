@@ -1,10 +1,12 @@
 package com.bignerdranch.android.photogallery
 
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.LiveData
@@ -20,6 +22,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
 private const val TAG = "PhotoGalleryFragment"
+private const val COLUMN_WIDTH = 150
 
 class PhotoGalleryFragment : Fragment() {
 
@@ -41,8 +44,20 @@ class PhotoGalleryFragment : Fragment() {
         val view = inflater.inflate(R.layout.fragment_photo_gallery, container, false)
 
         photoRecyclerView = view.findViewById(R.id.photo_recycler_view)
-        photoRecyclerView.layoutManager = GridLayoutManager(context, 3)
 
+        photoRecyclerView.viewTreeObserver.addOnGlobalLayoutListener(
+            object :ViewTreeObserver.OnGlobalLayoutListener {
+
+                override fun onGlobalLayout() {
+                    photoRecyclerView.viewTreeObserver.removeOnGlobalLayoutListener(this)
+
+                    val width = photoRecyclerView.width
+                    val columnWidth = convertDPtoPixels(COLUMN_WIDTH)
+                    val spanCount = Math.floor(width / columnWidth.toDouble()).toInt()
+
+                    photoRecyclerView.layoutManager = GridLayoutManager(context, spanCount)
+                }
+        })
         return view
     }
 
@@ -53,6 +68,12 @@ class PhotoGalleryFragment : Fragment() {
             Observer { galleryItems ->
                 photoRecyclerView.adapter = PhotoAdapter(galleryItems)
             })
+    }
+
+    private fun convertDPtoPixels(valueDP: Int) : Float {
+        val logicalDensity = getResources().getDisplayMetrics().density
+        Log.i(TAG, "density = $logicalDensity")
+        return valueDP * logicalDensity
     }
 
     private class PhotoHolder(itemTextView: TextView)
